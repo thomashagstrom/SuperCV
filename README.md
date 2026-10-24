@@ -1,5 +1,14 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Configuration
+
+Copy `.env.example` to `.env.local` and set:
+
+- `SESSION_SECRET` — signs session cookies (`openssl rand -base64 32`). Required in production, where the app throws if it is unset; development falls back to an insecure built-in value. The person deploying the app creates it.
+- `DATA_FILE` — optional path of the JSON file that stores users and resumes (default `.data/db.json`, created by the app on first write; it is not part of the repository).
+
+Run the tests with `npm test`.
+
 ## Getting Started
 
 First, run the development server:
