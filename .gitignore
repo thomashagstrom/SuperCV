@@ -32,6 +32,11 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+
+# local data store and npm logs
+/.data/
+/.npmlogs/
 
 # vercel
 .vercel
