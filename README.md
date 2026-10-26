@@ -26,7 +26,7 @@ Visitors sign up at `/sign-up`, sign in at `/sign-in` and land on `/resumes`. Ac
 
 Configuration (see `.env.example`):
 
-- `LOOMSHIFT_DATA_FILE` (optional) — path of that file. If unset, `.data/store.json` is used. Whoever runs the server must make the location writable.
+- `LOOMSHIFT_DATA_FILE` (optional) — path of that file. If unset, `.data/store.json` is used. The file is not in the repository; it is created the first time an account is saved. Whoever runs the server must make the location writable.
 
 Run the tests with `npm test`. They cover the store (sign up, sign in, sessions, per-user isolation); the pages and server actions are not covered by automated tests.
 
