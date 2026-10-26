@@ -2,10 +2,15 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { SESSION_COOKIE } from "@/lib/auth";
+import { revalidatePath } from "next/cache";
+import { requireUser, SESSION_COOKIE } from "@/lib/auth";
+import { extractResumeText } from "@/lib/extract";
 import {
+  createResume,
   createSession,
+  deleteResume,
   deleteSession,
+  renameResume,
   signUp,
   verifyCredentials,
 } from "@/lib/store";
@@ -55,6 +60,52 @@ export async function signInAction(
   if (!user) return { error: "Incorrect email or password." };
   await startSession(user.id);
   redirect("/resumes");
+}
+
+const MAX_TITLE_LENGTH = 100;
+
+export type ExtractState = { text?: string; error?: string };
+
+export async function extractFileAction(
+  formData: FormData,
+): Promise<ExtractState> {
+  await requireUser();
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { error: "Choose a PDF or DOCX file." };
+  }
+  return extractResumeText(file.name, new Uint8Array(await file.arrayBuffer()));
+}
+
+export async function addResumeAction(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const user = await requireUser();
+  const title = String(formData.get("title") ?? "").trim();
+  const content = String(formData.get("content") ?? "").trim();
+  if (!title) return { error: "Give your resume a title." };
+  if (title.length > MAX_TITLE_LENGTH) {
+    return { error: `Title must be at most ${MAX_TITLE_LENGTH} characters.` };
+  }
+  if (!content) return { error: "Paste your resume text or upload a file." };
+  createResume(user.id, title, content);
+  revalidatePath("/resumes");
+  redirect("/resumes");
+}
+
+export async function renameResumeAction(formData: FormData) {
+  const user = await requireUser();
+  const title = String(formData.get("title") ?? "").trim();
+  if (!title || title.length > MAX_TITLE_LENGTH) return;
+  renameResume(user.id, String(formData.get("id") ?? ""), title);
+  revalidatePath("/resumes");
+}
+
+export async function deleteResumeAction(formData: FormData) {
+  const user = await requireUser();
+  deleteResume(user.id, String(formData.get("id") ?? ""));
+  revalidatePath("/resumes");
 }
 
 export async function signOutAction() {

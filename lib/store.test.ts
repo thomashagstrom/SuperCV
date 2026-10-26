@@ -6,13 +6,17 @@ import {
   addTailoredVersion,
   createResume,
   createSession,
+  deleteResume,
   deleteSession,
+  renameResume,
   getResume,
   getUserBySession,
   listResumes,
   signUp,
   verifyCredentials,
 } from "./store";
+import { extractResumeText, MAX_FILE_BYTES } from "./extract";
+import { addedLabel } from "./format";
 
 beforeEach(() => {
   process.env.LOOMSHIFT_DATA_FILE = join(
@@ -78,5 +82,55 @@ describe("a signed-in user only ever sees their own resumes and tailored version
     expect(getResume(b.id, resume.id)).toBeNull();
     expect(addTailoredVersion(b.id, resume.id, "Spy", "x")).toBeNull();
     expect(getResume(a.id, resume.id)?.tailored).toHaveLength(1);
+  });
+});
+
+describe("saved resumes appear in 'My resumes' with a name and a date added", () => {
+  it("a created resume is listed with its title and createdAt, shown as an ADDED label", () => {
+    const user = signUp("ann@example.com", "correct horse");
+    const resume = createResume(user.id, "My CV", "text");
+    const [listed] = listResumes(user.id);
+    expect(listed.title).toBe("My CV");
+    expect(listed.createdAt).toBe(resume.createdAt);
+    expect(addedLabel("2026-05-12T10:00:00.000Z")).toBe("ADDED 12.05.2026");
+  });
+});
+
+describe("a user can rename or delete a saved resume", () => {
+  it("renames and deletes the owner's resume, and the list reflects it", () => {
+    const user = signUp("ann@example.com", "correct horse");
+    const resume = createResume(user.id, "Old", "text");
+    expect(renameResume(user.id, resume.id, "New")?.title).toBe("New");
+    expect(listResumes(user.id)[0].title).toBe("New");
+    expect(deleteResume(user.id, resume.id)).toBe(true);
+    expect(listResumes(user.id)).toEqual([]);
+  });
+
+  it("does not rename or delete another user's resume", () => {
+    const a = signUp("a@example.com", "password-a");
+    const b = signUp("b@example.com", "password-b");
+    const resume = createResume(a.id, "A's CV", "text");
+    expect(renameResume(b.id, resume.id, "Hacked")).toBeNull();
+    expect(deleteResume(b.id, resume.id)).toBe(false);
+    expect(getResume(a.id, resume.id)?.title).toBe("A's CV");
+  });
+});
+
+describe("if a file cannot be read, the user sees a clear error and can paste instead", () => {
+  it("returns an error mentioning pasting for a corrupt PDF or DOCX", async () => {
+    const junk = new TextEncoder().encode("not a real document");
+    for (const name of ["cv.pdf", "cv.docx"]) {
+      const result = await extractResumeText(name, junk);
+      expect(result).toHaveProperty("error");
+      expect(result).not.toHaveProperty("text");
+      expect((result as { error: string }).error).toMatch(/paste/i);
+    }
+  });
+
+  it("rejects unsupported file types and oversized files", async () => {
+    expect(await extractResumeText("cv.exe", new Uint8Array(1))).toHaveProperty("error");
+    expect(
+      await extractResumeText("cv.pdf", new Uint8Array(MAX_FILE_BYTES + 1)),
+    ).toHaveProperty("error");
   });
 });
