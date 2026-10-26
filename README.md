@@ -20,6 +20,16 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Accounts and storage
+
+Visitors sign up at `/sign-up`, sign in at `/sign-in` and land on `/resumes`. Accounts, sessions and resumes are kept in a JSON file, which is a simple local store, not a production database. Passwords are hashed with scrypt.
+
+Configuration (see `.env.example`):
+
+- `LOOMSHIFT_DATA_FILE` (optional) — path of that file. If unset, `.data/store.json` is used. The file is not in the repository; it is created the first time an account is saved. Whoever runs the server must make the location writable.
+
+Run the tests with `npm test`. They cover the store (sign up, sign in, sessions, per-user isolation); the pages and server actions are not covered by automated tests.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
