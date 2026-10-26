@@ -22,11 +22,12 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 
 ## Accounts and storage
 
-Visitors sign up at `/sign-up`, sign in at `/sign-in` and land on `/resumes`. Accounts, sessions and resumes are kept in a JSON file, which is a simple local store, not a production database. Passwords are hashed with scrypt.
+Visitors sign up at `/sign-up`, sign in at `/sign-in` and land on `/resumes`. Accounts, sessions and resumes are kept in a Redis-compatible REST store (Upstash Redis or Vercel KV) when it is configured, and otherwise in a local JSON file meant for development only. Passwords are hashed with scrypt.
 
 Configuration (see `.env.example`):
 
-- `LOOMSHIFT_DATA_FILE` (optional) — path of that file. If unset, `.data/store.json` is used. The file is not in the repository; it is created the first time an account is saved. Whoever runs the server must make the location writable.
+- `KV_REST_API_URL` and `KV_REST_API_TOKEN` (required in production) — URL and token of the REST store. Whoever deploys the app must create the database and set both. When both are set nothing is written to the deployment folder. If either is unset the local file is used, which fails on read-only hosting such as Vercel.
+- `LOOMSHIFT_DATA_FILE` (optional, development) — path of the local file. If unset, `.data/store.json` is used. The file is not in the repository; it is created the first time an account is saved. Whoever runs the server must make the location writable.
 
 Run the tests with `npm test`. They cover the store (sign up, sign in, sessions, per-user isolation); the pages and server actions are not covered by automated tests.
 
