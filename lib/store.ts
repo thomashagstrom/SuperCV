@@ -20,6 +20,8 @@ export type TailoredVersion = {
   id: string;
   target: string;
   content: string;
+  company?: string;
+  matched?: number;
   createdAt: string;
 };
 
@@ -174,6 +176,7 @@ export function addTailoredVersion(
   resumeId: string,
   target: string,
   content: string,
+  meta: { company?: string; matched?: number } = {},
 ): TailoredVersion | null {
   const data = load();
   const resume = data.resumes.find(
@@ -184,6 +187,7 @@ export function addTailoredVersion(
     id: randomUUID(),
     target,
     content,
+    ...meta,
     createdAt: new Date().toISOString(),
   };
   resume.tailored.push(version);

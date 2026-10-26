@@ -5,7 +5,10 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireUser, SESSION_COOKIE } from "@/lib/auth";
 import { extractResumeText } from "@/lib/extract";
+import { matchReadout, tailorResume } from "@/lib/tailor";
 import {
+  addTailoredVersion,
+  getResume,
   createResume,
   createSession,
   deleteResume,
@@ -92,6 +95,36 @@ export async function addResumeAction(
   createResume(user.id, title, content);
   revalidatePath("/resumes");
   redirect("/resumes");
+}
+
+export type TailorState = { error?: string; readout?: string; content?: string };
+
+export async function tailorResumeAction(
+  _prev: TailorState,
+  formData: FormData,
+): Promise<TailorState> {
+  const user = await requireUser();
+  const posting = {
+    title: String(formData.get("title") ?? "").trim(),
+    company: String(formData.get("company") ?? "").trim(),
+    description: String(formData.get("description") ?? "").trim(),
+  };
+  if (!posting.title || !posting.company || !posting.description) {
+    return { error: "Enter the job title, company and description." };
+  }
+  const resume = getResume(user.id, String(formData.get("id") ?? ""));
+  if (!resume) return { error: "Resume not found." };
+  try {
+    const { content, matched } = tailorResume(resume.content, posting);
+    addTailoredVersion(user.id, resume.id, posting.title, content, {
+      company: posting.company,
+      matched,
+    });
+    revalidatePath("/resumes");
+    return { content, readout: matchReadout(matched, posting.company) };
+  } catch (e) {
+    return { error: `Tailoring failed: ${(e as Error).message} Try again.` };
+  }
 }
 
 export async function renameResumeAction(formData: FormData) {

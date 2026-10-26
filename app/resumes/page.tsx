@@ -50,6 +50,9 @@ async function Resumes() {
                 </span>
               </div>
               <div className="flex flex-wrap gap-2">
+                <Link href={`/resumes/${r.id}/tailor`} className={BUTTON}>
+                  Tailor
+                </Link>
                 <form action={renameResumeAction} className="flex gap-2">
                   <input type="hidden" name="id" value={r.id} />
                   <input
