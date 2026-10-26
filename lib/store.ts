@@ -145,6 +145,30 @@ export function createResume(
   return resume;
 }
 
+export function renameResume(
+  userId: string,
+  id: string,
+  title: string,
+): Resume | null {
+  const data = load();
+  const resume = data.resumes.find((r) => r.id === id && r.userId === userId);
+  if (!resume) return null;
+  resume.title = title;
+  save(data);
+  return resume;
+}
+
+export function deleteResume(userId: string, id: string): boolean {
+  const data = load();
+  const index = data.resumes.findIndex(
+    (r) => r.id === id && r.userId === userId,
+  );
+  if (index === -1) return false;
+  data.resumes.splice(index, 1);
+  save(data);
+  return true;
+}
+
 export function addTailoredVersion(
   userId: string,
   resumeId: string,
