@@ -17,6 +17,7 @@ import {
 } from "./store";
 import { extractResumeText, MAX_FILE_BYTES } from "./extract";
 import { addedLabel } from "./format";
+import { matchReadout, tailorResume } from "./tailor";
 
 beforeEach(() => {
   process.env.LOOMSHIFT_DATA_FILE = join(
@@ -93,6 +94,61 @@ describe("saved resumes appear in 'My resumes' with a name and a date added", ()
     expect(listed.title).toBe("My CV");
     expect(listed.createdAt).toBe(resume.createdAt);
     expect(addedLabel("2026-05-12T10:00:00.000Z")).toBe("ADDED 12.05.2026");
+  });
+});
+
+describe("a user can paste a job posting and get a tailored resume", () => {
+  const cv = [
+    "Ann Lee",
+    "EXPERIENCE\nBaker at Oven Co 2019-2021\nBuilt dashboards in Python and SQL",
+    "SKILLS\nGardening\nPython\nSQL",
+  ].join("\n\n");
+  const posting = {
+    title: "Data Analyst",
+    company: "Acme Co",
+    description: "We need Python and SQL dashboards.",
+  };
+
+  it("reorders existing content, counts matched keywords and shows the MATCH readout", () => {
+    const { content, matched } = tailorResume(cv, posting);
+    expect(matched).toBe(3);
+    expect(matchReadout(matched, posting.company)).toBe("MATCH 3 KEYWORDS · ACME CO");
+    expect(content.indexOf("SKILLS")).toBeGreaterThan(-1);
+    expect(content.indexOf("Python\nSQL")).toBeLessThan(content.indexOf("Gardening"));
+  });
+
+  it("never invents lines, employers, titles or dates absent from the original", () => {
+    const { content } = tailorResume(cv, posting);
+    const original = cv.split("\n").filter(Boolean).sort();
+    expect(content.split("\n").filter(Boolean).sort()).toEqual(original);
+    expect(content).not.toContain("Acme");
+    expect(content).not.toContain("Data Analyst");
+  });
+
+  it("stores the version with company and count, and not for another user's resume", () => {
+    const a = signUp("a@example.com", "password-a");
+    const b = signUp("b@example.com", "password-b");
+    const resume = createResume(a.id, "CV", cv);
+    const { content, matched } = tailorResume(cv, posting);
+    addTailoredVersion(a.id, resume.id, posting.title, content, {
+      company: posting.company,
+      matched,
+    });
+    expect(getResume(a.id, resume.id)?.tailored[0]).toMatchObject({
+      company: "Acme Co",
+      matched: 3,
+    });
+    expect(addTailoredVersion(b.id, resume.id, "x", "x")).toBeNull();
+  });
+
+  it("fails on a posting without keywords, leaving the resume unchanged and retryable", () => {
+    const a = signUp("a@example.com", "password-a");
+    const resume = createResume(a.id, "CV", cv);
+    expect(() =>
+      tailorResume(cv, { title: "", company: "X", description: "the and" }),
+    ).toThrow();
+    expect(getResume(a.id, resume.id)).toMatchObject({ content: cv, tailored: [] });
+    expect(tailorResume(cv, posting).matched).toBe(3);
   });
 });
 
