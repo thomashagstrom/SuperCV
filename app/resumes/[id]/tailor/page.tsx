@@ -10,7 +10,7 @@ async function Guard({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   const resume = await getResume(user.id, (await params).id);
   if (!resume) notFound();
-  return <TailorForm id={resume.id} title={resume.title} />;
+  return <TailorForm id={resume.id} title={resume.title} original={resume.content} />;
 }
 
 export default function TailorPage({
