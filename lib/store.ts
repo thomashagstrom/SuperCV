@@ -21,8 +21,10 @@ export type TailoredVersion = {
   target: string;
   content: string;
   company?: string;
+  description?: string;
   matched?: number;
   createdAt: string;
+  updatedAt?: string;
 };
 
 type StoredUser = User & { passwordHash: string };
@@ -224,7 +226,7 @@ export async function addTailoredVersion(
   resumeId: string,
   target: string,
   content: string,
-  meta: { company?: string; matched?: number } = {},
+  meta: { company?: string; description?: string; matched?: number } = {},
 ): Promise<TailoredVersion | null> {
   const data = await load();
   const resume = data.resumes.find(
@@ -241,4 +243,37 @@ export async function addTailoredVersion(
   resume.tailored.push(version);
   await save(data);
   return version;
+}
+
+export async function updateTailoredVersion(
+  userId: string,
+  resumeId: string,
+  versionId: string,
+  content: string,
+): Promise<TailoredVersion | null> {
+  const data = await load();
+  const version = data.resumes
+    .find((r) => r.id === resumeId && r.userId === userId)
+    ?.tailored.find((v) => v.id === versionId);
+  if (!version) return null;
+  version.content = content;
+  version.updatedAt = new Date().toISOString();
+  await save(data);
+  return version;
+}
+
+export async function deleteTailoredVersion(
+  userId: string,
+  resumeId: string,
+  versionId: string,
+): Promise<boolean> {
+  const data = await load();
+  const resume = data.resumes.find(
+    (r) => r.id === resumeId && r.userId === userId,
+  );
+  const index = resume?.tailored.findIndex((v) => v.id === versionId) ?? -1;
+  if (!resume || index === -1) return false;
+  resume.tailored.splice(index, 1);
+  await save(data);
+  return true;
 }

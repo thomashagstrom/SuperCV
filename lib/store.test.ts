@@ -12,9 +12,12 @@ import {
   getResume,
   getUserBySession,
   listResumes,
+  deleteTailoredVersion,
   signUp,
+  updateTailoredVersion,
   verifyCredentials,
 } from "./store";
+import { changedLines } from "./diff";
 import { extractResumeText, MAX_FILE_BYTES } from "./extract";
 import { addedLabel } from "./format";
 import { matchReadout, tailorResume } from "./tailor";
@@ -149,6 +152,44 @@ describe("a user can paste a job posting and get a tailored resume", () => {
     ).toThrow();
     expect(await getResume(a.id, resume.id)).toMatchObject({ content: cv, tailored: [] });
     expect(tailorResume(cv, posting).matched).toBe(3);
+  });
+});
+
+describe("a user can review, edit and save a tailored version", () => {
+  it("highlights the changed lines next to the original", () => {
+    expect([...changedLines("a\nb\nc", "a\nc\nb")]).toEqual([1, 2]);
+    expect(changedLines("a\nb", "a\nb").size).toBe(0);
+  });
+
+  it("stores the version linked to its resume and posting, and reopens it exactly as last saved", async () => {
+    const a = await signUp("a@example.com", "password-a");
+    const resume = await createResume(a.id, "CV", "orig");
+    const v = await addTailoredVersion(a.id, resume.id, "Analyst", "draft", {
+      company: "Acme",
+      description: "Python please",
+    });
+    await updateTailoredVersion(a.id, resume.id, v!.id, "edited by hand");
+    expect((await getResume(a.id, resume.id))?.tailored[0]).toMatchObject({
+      target: "Analyst",
+      company: "Acme",
+      description: "Python please",
+      content: "edited by hand",
+    });
+  });
+
+  it("deletes a version without touching the original, and never for another user", async () => {
+    const a = await signUp("a@example.com", "password-a");
+    const b = await signUp("b@example.com", "password-b");
+    const resume = await createResume(a.id, "CV", "orig");
+    const v = (await addTailoredVersion(a.id, resume.id, "Analyst", "draft"))!;
+    expect(await updateTailoredVersion(b.id, resume.id, v.id, "hacked")).toBeNull();
+    expect(await deleteTailoredVersion(b.id, resume.id, v.id)).toBe(false);
+    expect((await getResume(a.id, resume.id))?.tailored[0].content).toBe("draft");
+    expect(await deleteTailoredVersion(a.id, resume.id, v.id)).toBe(true);
+    expect(await getResume(a.id, resume.id)).toMatchObject({
+      content: "orig",
+      tailored: [],
+    });
   });
 });
 

@@ -74,6 +74,18 @@ async function Resumes() {
                   </button>
                 </form>
               </div>
+              {r.tailored.length > 0 && (
+                <ul aria-label={`Tailored versions of ${r.title}`} className="flex flex-col gap-1">
+                  {r.tailored.map((v) => (
+                    <li key={v.id} className="font-mono text-xs">
+                      <Link href={`/resumes/${r.id}/versions/${v.id}`}>
+                        {v.company ? `${v.company} · ` : ""}
+                        {v.target} · {addedLabel(v.createdAt)}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </li>
           ))}
         </ul>

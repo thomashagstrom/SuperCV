@@ -2,13 +2,26 @@
 
 import Link from "next/link";
 import { useActionState, useState } from "react";
-import { tailorResumeAction, type TailorState } from "../../../actions";
+import {
+  saveTailoredAction,
+  tailorResumeAction,
+  type TailorState,
+} from "../../../actions";
+import { TailoredEditor } from "./editor";
 
 const INPUT =
   "border border-foreground/40 bg-transparent p-3 text-base normal-case tracking-normal";
 const LABEL = "flex flex-col gap-1 font-mono text-xs uppercase tracking-widest";
 
-export function TailorForm({ id, title }: { id: string; title: string }) {
+export function TailorForm({
+  id,
+  title,
+  original,
+}: {
+  id: string;
+  title: string;
+  original: string;
+}) {
   const [state, formAction, pending] = useActionState<TailorState, FormData>(
     tailorResumeAction,
     {},
@@ -28,6 +41,7 @@ export function TailorForm({ id, title }: { id: string; title: string }) {
   });
 
   return (
+    <div className="flex w-full flex-col gap-8">
     <form action={formAction} className="flex w-full max-w-xl flex-col gap-5">
       <h1 className="font-heading text-5xl font-black uppercase leading-none">
         Tailor resume
@@ -62,18 +76,24 @@ export function TailorForm({ id, title }: { id: string; title: string }) {
         {pending ? "Tailoring…" : state.error ? "Retry" : "Tailor resume"}
       </button>
       {!pending && state.readout && (
-        <>
-          <p className="font-mono text-xs uppercase tracking-widest">
-            {state.readout}
-          </p>
-          <pre className="whitespace-pre-wrap border border-foreground/20 p-4 text-sm">
-            {state.content}
-          </pre>
-        </>
+        <p className="font-mono text-xs uppercase tracking-widest">
+          {state.readout}
+        </p>
       )}
       <p className="font-mono text-xs text-muted">
         <Link href="/resumes">Back to resumes</Link>
       </p>
     </form>
+    {!pending && state.content && (
+      <TailoredEditor
+        key={state.content}
+        original={original}
+        initial={state.content}
+        action={saveTailoredAction}
+        submitLabel="Save tailored version"
+        fields={{ id, ...posting, matched: String(state.matched ?? "") }}
+      />
+    )}
+    </div>
   );
 }

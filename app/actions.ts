@@ -13,7 +13,9 @@ import {
   createSession,
   deleteResume,
   deleteSession,
+  deleteTailoredVersion,
   renameResume,
+  updateTailoredVersion,
   signUp,
   verifyCredentials,
 } from "@/lib/store";
@@ -104,7 +106,12 @@ export async function addResumeAction(
   redirect("/resumes");
 }
 
-export type TailorState = { error?: string; readout?: string; content?: string };
+export type TailorState = {
+  error?: string;
+  readout?: string;
+  content?: string;
+  matched?: number;
+};
 
 export async function tailorResumeAction(
   _prev: TailorState,
@@ -123,15 +130,68 @@ export async function tailorResumeAction(
   if (!resume) return { error: "Resume not found." };
   try {
     const { content, matched } = tailorResume(resume.content, posting);
-    await addTailoredVersion(user.id, resume.id, posting.title, content, {
-      company: posting.company,
+    return {
+      content,
       matched,
-    });
-    revalidatePath("/resumes");
-    return { content, readout: matchReadout(matched, posting.company) };
+      readout: matchReadout(matched, posting.company),
+    };
   } catch (e) {
     return { error: `Tailoring failed: ${(e as Error).message} Try again.` };
   }
+}
+
+// The tailored text is only stored when the user saves it after reviewing.
+export async function saveTailoredAction(
+  _prev: TailorState,
+  formData: FormData,
+): Promise<TailorState> {
+  const user = await requireUser();
+  const content = String(formData.get("content") ?? "").trim();
+  if (!content) return { error: "The tailored resume can't be empty." };
+  const matched = Number(formData.get("matched"));
+  const version = await addTailoredVersion(
+    user.id,
+    String(formData.get("id") ?? ""),
+    String(formData.get("title") ?? "").trim(),
+    content,
+    {
+      company: String(formData.get("company") ?? "").trim(),
+      description: String(formData.get("description") ?? "").trim(),
+      matched: Number.isFinite(matched) ? matched : undefined,
+    },
+  );
+  if (!version) return { error: "Resume not found." };
+  revalidatePath("/resumes");
+  redirect(`/resumes/${String(formData.get("id"))}/versions/${version.id}`);
+}
+
+export async function updateTailoredAction(
+  _prev: TailorState,
+  formData: FormData,
+): Promise<TailorState> {
+  const user = await requireUser();
+  const content = String(formData.get("content") ?? "").trim();
+  if (!content) return { error: "The tailored resume can't be empty." };
+  const version = await updateTailoredVersion(
+    user.id,
+    String(formData.get("id") ?? ""),
+    String(formData.get("versionId") ?? ""),
+    content,
+  );
+  if (!version) return { error: "Tailored version not found." };
+  revalidatePath("/resumes");
+  return { content, readout: "Saved." };
+}
+
+export async function deleteTailoredAction(formData: FormData) {
+  const user = await requireUser();
+  await deleteTailoredVersion(
+    user.id,
+    String(formData.get("id") ?? ""),
+    String(formData.get("versionId") ?? ""),
+  );
+  revalidatePath("/resumes");
+  redirect("/resumes");
 }
 
 export async function renameResumeAction(formData: FormData) {
