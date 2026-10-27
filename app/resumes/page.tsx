@@ -12,7 +12,7 @@ const BUTTON =
 
 async function Resumes() {
   const user = await requireUser();
-  const resumes = listResumes(user.id);
+  const resumes = await listResumes(user.id);
   return (
     <>
       <h1 className="font-heading text-5xl font-black uppercase leading-none">

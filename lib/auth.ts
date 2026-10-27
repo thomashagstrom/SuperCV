@@ -6,7 +6,7 @@ export const SESSION_COOKIE = "loomshift_session";
 
 export async function getCurrentUser() {
   const jar = await cookies();
-  return getUserBySession(jar.get(SESSION_COOKIE)?.value);
+  return await getUserBySession(jar.get(SESSION_COOKIE)?.value);
 }
 
 export async function requireUser() {
