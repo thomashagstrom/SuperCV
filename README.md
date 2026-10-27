@@ -27,9 +27,9 @@ Visitors sign up at `/sign-up`, sign in at `/sign-in` and land on `/resumes`. Ac
 Configuration (see `.env.example`). All of these are read at runtime on each request, not at build time, so setting them on the running service is enough:
 
 - `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` (required in production) — REST URL and token of an Upstash Redis database, which whoever deploys the app must create. When both are set, all data is stored there. If either is unset, the local file is used, which fails on a read-only host.
-- `LOOMSHIFT_DATA_FILE` (optional, local development) — path of the JSON file used when no Upstash database is configured. If unset, `.data/store.json` is used. The file is created the first time an account is saved; the location must be writable.
+- `LOOMSHIFT_DATA_FILE` (optional, local development) — path of the JSON file used when no Upstash database is configured. If unset, the app writes to a `store.json` file inside a `.data` folder under the working directory. That file is not in the repository; it is created the first time an account is saved, and the location must be writable.
 
-Run the tests with `npm test`. They cover the store (sign up, sign in, sessions, per-user isolation); the pages and server actions are not covered by automated tests.
+Run the tests with `npm test`. They cover the store (sign up, sign in, sessions, per-user isolation); the sign-up server action is covered too; the pages are not covered by automated tests.
 
 ## Learn More
 
