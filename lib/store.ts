@@ -4,7 +4,7 @@ import {
   scryptSync,
   timingSafeEqual,
 } from "node:crypto";
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
 export type User = { id: string; email: string };
@@ -33,6 +33,7 @@ type Data = {
 };
 
 const SESSION_TOKEN_BYTES = 32;
+const REMOTE_KEY = "loomshift:store";
 
 function filePath() {
   return resolve(
@@ -41,20 +42,58 @@ function filePath() {
   );
 }
 
-function load(): Data {
+// Read on every call, so the running service's environment picks the store.
+function remote() {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  return url && token ? { url, token } : null;
+}
+
+async function command(
+  r: { url: string; token: string },
+  args: string[],
+): Promise<string | null> {
+  const res = await fetch(r.url, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${r.token}` },
+    body: JSON.stringify(args),
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`Remote store responded ${res.status}`);
+  return ((await res.json()) as { result: string | null }).result;
+}
+
+function empty(): Data {
+  return { users: [], sessions: {}, resumes: [] };
+}
+
+async function load(): Promise<Data> {
+  const r = remote();
+  if (r) {
+    const raw = await command(r, ["GET", REMOTE_KEY]);
+    return raw ? (JSON.parse(raw) as Data) : empty();
+  }
   try {
-    return JSON.parse(readFileSync(/*turbopackIgnore: true*/ filePath(), "utf8")) as Data;
-  } catch {
-    return { users: [], sessions: {}, resumes: [] };
+    return JSON.parse(
+      await readFile(/*turbopackIgnore: true*/ filePath(), "utf8"),
+    ) as Data;
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") return empty();
+    throw e;
   }
 }
 
-function save(data: Data) {
+async function save(data: Data) {
+  const r = remote();
+  if (r) {
+    await command(r, ["SET", REMOTE_KEY, JSON.stringify(data)]);
+    return;
+  }
   const path = filePath();
-  mkdirSync(dirname(path), { recursive: true });
+  await mkdir(dirname(path), { recursive: true });
   const tmp = `${path}.${process.pid}.tmp`;
-  writeFileSync(tmp, JSON.stringify(data));
-  renameSync(tmp, path);
+  await writeFile(tmp, JSON.stringify(data));
+  await rename(tmp, path);
 }
 
 function hashPassword(password: string) {
@@ -73,8 +112,8 @@ export function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
-export function signUp(email: string, password: string): User {
-  const data = load();
+export async function signUp(email: string, password: string): Promise<User> {
+  const data = await load();
   const normalized = normalizeEmail(email);
   if (data.users.some((u) => u.email === normalized)) {
     throw new Error("An account with this email already exists.");
@@ -85,55 +124,61 @@ export function signUp(email: string, password: string): User {
     passwordHash: hashPassword(password),
   };
   data.users.push(user);
-  save(data);
+  await save(data);
   return { id: user.id, email: user.email };
 }
 
-export function verifyCredentials(email: string, password: string) {
-  const user = load().users.find((u) => u.email === normalizeEmail(email));
+export async function verifyCredentials(email: string, password: string) {
+  const user = (await load()).users.find((u) => u.email === normalizeEmail(email));
   if (!user || !checkPassword(password, user.passwordHash)) return null;
   return { id: user.id, email: user.email };
 }
 
-export function createSession(userId: string) {
-  const data = load();
+export async function createSession(userId: string) {
+  const data = await load();
   const token = randomBytes(SESSION_TOKEN_BYTES).toString("hex");
   data.sessions[token] = userId;
-  save(data);
+  await save(data);
   return token;
 }
 
-export function getUserBySession(token: string | undefined): User | null {
+export async function getUserBySession(
+  token: string | undefined,
+): Promise<User | null> {
   if (!token) return null;
-  const data = load();
+  const data = await load();
   const userId = data.sessions[token];
   const user = data.users.find((u) => u.id === userId);
   return user ? { id: user.id, email: user.email } : null;
 }
 
-export function deleteSession(token: string) {
-  const data = load();
+export async function deleteSession(token: string) {
+  const data = await load();
   delete data.sessions[token];
-  save(data);
+  await save(data);
 }
 
 // Every resume query takes the owner's id and filters on it.
-export function listResumes(userId: string): Resume[] {
-  return load().resumes.filter((r) => r.userId === userId);
+export async function listResumes(userId: string): Promise<Resume[]> {
+  return (await load()).resumes.filter((r) => r.userId === userId);
 }
 
-export function getResume(userId: string, id: string): Resume | null {
+export async function getResume(
+  userId: string,
+  id: string,
+): Promise<Resume | null> {
   return (
-    load().resumes.find((r) => r.id === id && r.userId === userId) ?? null
+    (await load()).resumes.find((r) => r.id === id && r.userId === userId) ??
+    null
   );
 }
 
-export function createResume(
+export async function createResume(
   userId: string,
   title: string,
   content: string,
-): Resume {
-  const data = load();
+): Promise<Resume> {
+  const data = await load();
   const resume: Resume = {
     id: randomUUID(),
     userId,
@@ -143,42 +188,45 @@ export function createResume(
     tailored: [],
   };
   data.resumes.push(resume);
-  save(data);
+  await save(data);
   return resume;
 }
 
-export function renameResume(
+export async function renameResume(
   userId: string,
   id: string,
   title: string,
-): Resume | null {
-  const data = load();
+): Promise<Resume | null> {
+  const data = await load();
   const resume = data.resumes.find((r) => r.id === id && r.userId === userId);
   if (!resume) return null;
   resume.title = title;
-  save(data);
+  await save(data);
   return resume;
 }
 
-export function deleteResume(userId: string, id: string): boolean {
-  const data = load();
+export async function deleteResume(
+  userId: string,
+  id: string,
+): Promise<boolean> {
+  const data = await load();
   const index = data.resumes.findIndex(
     (r) => r.id === id && r.userId === userId,
   );
   if (index === -1) return false;
   data.resumes.splice(index, 1);
-  save(data);
+  await save(data);
   return true;
 }
 
-export function addTailoredVersion(
+export async function addTailoredVersion(
   userId: string,
   resumeId: string,
   target: string,
   content: string,
   meta: { company?: string; matched?: number } = {},
-): TailoredVersion | null {
-  const data = load();
+): Promise<TailoredVersion | null> {
+  const data = await load();
   const resume = data.resumes.find(
     (r) => r.id === resumeId && r.userId === userId,
   );
@@ -191,6 +239,6 @@ export function addTailoredVersion(
     createdAt: new Date().toISOString(),
   };
   resume.tailored.push(version);
-  save(data);
+  await save(data);
   return version;
 }
