@@ -7,3 +7,24 @@ runConfig:
   memoryMiB: 512
   minInstances: 0
   maxInstances: 2
+env:
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: AIzaSyAL2EAhyeZcGNaZj4uiUgLr2IulJwoXPOU
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: supercv-ol2nx.firebaseapp.com
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: supercv-ol2nx
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: 1:169719530521:web:508aaa8ad41b98f8bf9688
+    availability:
+      - BUILD
+      - RUNTIME
