@@ -43,3 +43,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Firebase emulators
+.firebase/
+firebase-debug.log*
+firestore-debug.log
+ui-debug.log
+
+# create-next-app ignores every .env*; the example file lists names only and is committed
+!.env.example
